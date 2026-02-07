@@ -233,8 +233,16 @@
             const loading = document.getElementById("loading");
             loading.style.display = "block";
 
-            fetch("/predict", { method: "POST", body: formData })
-            .then(res => res.json())
+            fetch("/predict", {
+                method: "POST",
+                body: formData
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error("Failed to upload image");
+                }
+                return res.json();
+            })
             .then(data => {
                 loading.style.display = "none";
                 let color = data.defect === "Normal" ? "var(--success)" : "var(--danger)";
@@ -250,6 +258,11 @@
                 `;
                 speakResult(`Defect detected: ${data.defect}. Confidence level: ${data.confidence} percent.`);
                 loadHistory();
+            })
+            .catch(error => {
+                loading.style.display = "none";
+                alert("Error: " + error.message);
+                console.error("Upload error:", error);
             });
         }
 
