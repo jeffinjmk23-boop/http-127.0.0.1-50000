@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wafer Defect Inspection | Edge AI</title>
+
+    <style>
+        :root {
+            --bg: #0b1220;
+            --card: #111a2e;
+            --accent: #38bdf8;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: "Segoe UI", system-ui, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #020617, #020617);
+            color: var(--text);
+        }
+
+        header {
+            padding: 20px 40px;
+            border-bottom: 1px solid #1f2937;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        header span {
+            color: var(--accent);
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1.4fr;
+            gap: 25px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .upload-box {
+            border: 2px dashed #334155;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            transition: 0.3s;
+        }
+
+        .upload-box:hover {
+            border-color: var(--accent);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-label {
+            cursor: pointer;
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent);
+            color: #020617;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(56,189,248,0.4);
+        }
+
+        .result {
+            margin-top: 25px;
+            padding: 16px;
+            border-radius: 10px;
+            background: #020617;
+            border-left: 4px solid var(--accent);
+        }
+
+        .result strong {
+            font-size: 18px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            font-size: 14px;
+            border-bottom: 1px solid #1f2937;
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        tr:hover {
+            background: #020617;
+        }
+
+        footer {
+            text-align: center;
+            padding: 15px;
+            color: var(--muted);
+            font-size: 13px;
+            border-top: 1px solid #1f2937;
+        }
+
+        @media(max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Semiconductor Wafer Inspection <span>Edge AI System</span></h1>
+</header>
+
+<div class="container">
+
+    <!-- LEFT -->
+    <div class="card">
+        <h2>Image Inspection</h2>
+
+        <div class="upload-box">
+            <label class="upload-label">
+                Click to upload wafer image
+                <input type="file" id="image" onchange="previewImage()">
+            </label>
+            <img id="imagePreview" style="display:none; margin-top:10px; max-width:100%; border-radius:8px;" />
+        </div>
+
+        <button onclick="upload()">Run Inspection</button>
+        <div id="loading" style="display:none; margin-top:10px; color:var(--accent);">Analyzing...</div>
+
+        <div class="result" id="result" style="display:none"></div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="card">
+        <h2>Inspection History</h2>
+        <table id="history">
+            <tr>
+                <th>Image</th>
+                <th>Defect Type</th>
+                <th>Confidence</th>
+                <th>Timestamp</th>
+            </tr>
+        </table>
+    </div>
+
+</div>
+
+<footer>
+    Edge AI–Based Defect Classification System · Local Inference · Industry 4.0
+</footer>
+
+<script>
+        function speakResult(text) {
+            const synth = window.speechSynthesis;
+            if (!synth) {
+                console.error('Speech synthesis is not supported in this browser.');
+                alert('Your browser does not support voice output. Please use a modern browser like Chrome or Edge.');
+                return;
+            }
+
+            console.log('Speech synthesis started');
+            try {
+                synth.cancel(); // Clear any ongoing speech
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.onstart = () => console.log('Speech started');
+                utterance.onend = () => console.log('Speech ended');
+                utterance.onerror = (e) => console.error('Speech error:', e);
+                synth.speak(utterance);
+            } catch (error) {
+                console.error('Speech synthesis failed:', error);
+            }
+        }
+
+        function upload() {
+            let img = document.getElementById("image").files[0];
+            if (!img) return;
+
+            let formData = new FormData();
+            formData.append("image", img);
+
+            const loading = document.getElementById("loading");
+            loading.style.display = "block";
+
+            fetch("/predict", { method: "POST", body: formData })
+            .then(res => res.json())
+            .then(data => {
+                loading.style.display = "none";
+                let color = data.defect === "Normal" ? "var(--success)" : "var(--danger)";
+                let box = document.getElementById("result");
+                box.style.display = "block";
+                box.style.borderLeftColor = color;
+                box.innerHTML = `
+                    <strong>${data.defect}</strong><br>
+                    Confidence: ${data.confidence}%
+                    <div style="background:#1f2937; border-radius:8px; margin-top:10px;">
+                        <div style="width:${data.confidence}%; height:10px; background:var(--accent); border-radius:8px;"></div>
+                    </div>
+                `;
+                speakResult(`Defect detected: ${data.defect}. Confidence level: ${data.confidence} percent.`);
+                loadHistory();
+            });
+        }
+
+        function loadHistory() {
+            fetch("/history")
+            .then(res => res.json())
+            .then(data => {
+                let table = document.getElementById("history");
+                table.innerHTML = `
+            <tr>
+                <th>Image</th>
+                <th>Defect Type</th>
+                <th>Confidence</th>
+                <th>Timestamp</th>
+            </tr>
+        `;
+                data.forEach(d => {
+                    table.innerHTML += `
+                <tr>
+                    <td>${d.filename}</td>
+                    <td>${d.defect}</td>
+                    <td>${d.confidence}%</td>
+                    <td>${d.time}</td>
+                </tr>
+            `;
+                });
+            });
+        }
+
+        function previewImage() {
+            const file = document.getElementById('image').files[0];
+            const preview = document.getElementById('imagePreview');
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+    </script>
+
+</body>
+</html>
+
+
+
+
